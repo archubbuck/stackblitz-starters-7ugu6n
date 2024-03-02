@@ -2,28 +2,37 @@
 
 console.log(`Hello Node.js v${process.versions.node}!`);
 
-const phrases = [
-  'This is a test to do something really cool',
-  'but it may not be that cool',
-  'we might find out, I hope we see...',
-  "or else I won't be able to leave this alone",
-  'until it agrees with me!',
-];
-
 const map = new Map();
 
-phrases.forEach((phrase) => {
-  const normalizedPhrase = phrase
-    .toLowerCase()
-    .split(' ')
-    .replace(/[^\p{L}\d]/gu, '');
+const csv = require('csv-parser')
+const fs = require('fs')
 
-  const words = phrase.split(' ');
-
+const processRow = (row) => {
+  console.log(JSON.stringify(row, null, 4));
+  const { ID, Title, Tags } = row;
+  const words = Title.split(' ');
   words.forEach((word) => {
     const token = word.toLowerCase().replace(/[^\p{L}\d]/gu, '');
-    map.set(token, map.has(token) ? [...map.get(token), word] : [word]);
+    if (!token) return;
+    map.set(token, map.has(token) ? Array.from(new Set([...map.get(token), Title])) : [Title]);
   });
-});
+  Tags?.split("; ").filter(s => s).forEach((tag) => {
+    const token = tag.toLowerCase().replace(/[^:\s\p{L}\d]/gu, '');
+    if (!token) return;
+    map.set(token, map.has(token) ? Array.from(new Set([...map.get(token), Title])) : [Title]);
+  })
+}
 
-console.table(map);
+const logResults = () => {
+  const data = Array.from(map).map(([tokenOrTag, matches]) => ({
+    tokenOrTag,
+    frequency: matches.length,
+  }));
+  data.sort((a, b) => b.frequency - a.frequency);
+  console.table(data);
+}
+
+fs.createReadStream('data.csv')
+  .pipe(csv())
+  .on('data', (data) => processRow(data))
+  .on('end', () => logResults());
